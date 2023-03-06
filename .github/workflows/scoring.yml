@@ -1,0 +1,54 @@
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sonarqube:
+    environment: SCORING
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      PERSONAL_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+      PROJECT_ID: ${{ github.event.repository.name }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check out code 🛎
+        uses: actions/checkout@v2
+
+      - name: Generate coverage
+        run: |
+          yarn
+          yarn test --json --watchAll=false --coverage --outputFile=output.json
+          
+      - name: Update solution
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          result-encoding: string
+          script: |
+            try {
+              const fs = require('fs')
+              const jsonString = fs.readFileSync('./output.json')
+              const output = JSON.parse(jsonString)
+              const assertionResults = []
+              output.testResults[0].assertionResults.forEach((objective, i) => {
+                if (objective.status === 'passed') assertionResults.push(i)
+              })
+              console.log('Updating score...')
+              await github.request(`PATCH https://api.nuwe.io/projects/${process.env.PROJECT_ID}/objectives`, {
+                bearerToken: process.env.PERSONAL_TOKEN, 
+                assertionResults
+              })
+              console.log('Done')
+            } catch(err) {
+              core.error("Error while reading or parsing the output JSON")
+              core.setFailed(err)
+            }
+      - name: SonarQube scan 🚨
+        if: always()
+        uses: sonarsource/sonarqube-scan-action@master
+        with:
+          args: >
+            -Dsonar.projectKey=${{ github.event.repository.name }}

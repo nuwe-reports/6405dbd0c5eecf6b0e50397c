@@ -37,7 +37,7 @@ jobs:
                 if (objective.status === 'passed') assertionResults.push(i)
               })
               console.log('Updating score...')
-              await github.request(`PATCH https://api.nuwe.io/projects/${process.env.PROJECT_ID}/objectives`, {
+              await github.request(`PATCH https://dev.api.nuwe.io/projects/${process.env.PROJECT_ID}/objectives`, {
                 bearerToken: process.env.PERSONAL_TOKEN, 
                 assertionResults
               })
